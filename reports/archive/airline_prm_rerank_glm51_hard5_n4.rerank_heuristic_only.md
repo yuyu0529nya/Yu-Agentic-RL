@@ -1,0 +1,27 @@
+# PRM-rerank Report: airline_prm_rerank_glm51_hard5_n4
+
+## Summary
+
+| Metric | Value |
+| --- | ---: |
+| Score mode | `heuristic_only` |
+| Tasks | 5 |
+| Simulations | 20 |
+| Samples per task | 4 |
+| First-trial pass | 0.4000 |
+| Raw sample success rate | 0.3500 |
+| Oracle pass@N | 0.8000 |
+| PRM-rerank pass@N | 0.6000 |
+| PRM gain vs first trial | +0.2000 |
+| PRM gap to oracle | 0.2000 |
+| Selection accuracy on solvable tasks | 0.7500 |
+
+## Per-task Rerank
+
+| Task | Samples | Successes | First | Oracle | PRM Selected | Best Success | Scores | Tags |
+| --- | ---: | ---: | --- | --- | --- | --- | --- | --- |
+| 1 | 4 | 1 | t0: 0.0000 / -4.0 | True | t1: 1.0000 / 0.0 | t1: 0.0 | r=0.0000, p=-4.0<br>r=1.0000, p=0.0<br>r=0.0000, p=-4.0<br>r=0.0000, p=-4.0 | - |
+| 2 | 4 | 1 | t0: 1.0000 / 1.5 | True | t0: 1.0000 / 1.5 | t0: 1.5 | r=1.0000, p=1.5<br>r=0.0000, p=-3.0<br>r=0.0000, p=-6.5<br>r=0.0000, p=-5.0 | - |
+| 23 | 4 | 1 | t0: 0.0000 / 0.0 | True | t0: 0.0000 / 0.0 | t3: 0.0 | r=0.0000, p=0.0<br>r=0.0000, p=-1.0<br>r=0.0000, p=-1.0<br>r=1.0000, p=0.0 | `calculation_error`, `payment_planning_error` |
+| 37 | 4 | 4 | t0: 1.0000 / 0.0 | True | t0: 1.0000 / 0.0 | t0: 0.0 | r=1.0000, p=0.0<br>r=1.0000, p=0.0<br>r=1.0000, p=0.0<br>r=1.0000, p=0.0 | - |
+| 44 | 4 | 0 | t0: 0.0000 / 0.0 | False | t0: 0.0000 / 0.0 | - | r=0.0000, p=0.0<br>r=0.0000, p=-2.0<br>r=0.0000, p=-2.0<br>r=0.0000, p=0.0 | `communication_db_gap` |

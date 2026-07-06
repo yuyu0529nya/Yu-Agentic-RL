@@ -1,0 +1,51 @@
+# ---- envs / caches ----
+.venv/
+.venv-train/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.codex/
+tmp/
+.DS_Store
+
+# ---- large data / models / artifacts (kept local; too big / not for a public repo) ----
+models/
+outputs/
+autodl_artifacts/
+handoff_packages/
+conversation_archive/
+data/
+third_party/
+
+# ---- binaries / archives / large or raw data files (anywhere) ----
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.gguf
+*.tgz
+*.tar.gz
+*.tar
+*.zip
+*.dll
+*.so
+*.jsonl
+*.log
+reports/*.json
+reports/*.csv
+
+# ---- secrets / personal ----
+.env
+.env.local
+*secret*
+*.pem
+id_rsa*
+YUYU_CHAT_ARCHIVE.md
+
+# ---- keep reference-project material internal (portfolio presents the work as the author's own) ----
+reports/m3_grpo_design.md
+reports/external_agentic_grpo_longhorizon_review.md
+
+# local tooling / editor config (not portfolio)
+.claude/

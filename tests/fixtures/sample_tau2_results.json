@@ -1,0 +1,66 @@
+{
+  "info": {
+    "num_trials": 2,
+    "environment_info": {
+      "domain_name": "airline"
+    },
+    "agent_info": {
+      "implementation": "llm_agent",
+      "llm": "openai/gpt-4.1-mini"
+    },
+    "user_info": {
+      "implementation": "user_simulator",
+      "llm": "openai/gpt-4.1-mini"
+    }
+  },
+  "tasks": [
+    {
+      "id": "0"
+    },
+    {
+      "id": "1"
+    }
+  ],
+  "simulations": [
+    {
+      "id": "sim-0-a",
+      "task_id": "0",
+      "trial": 0,
+      "termination_reason": "USER_STOP",
+      "messages": [],
+      "reward_info": {
+        "reward": 1.0
+      }
+    },
+    {
+      "id": "sim-0-b",
+      "task_id": "0",
+      "trial": 1,
+      "termination_reason": "USER_STOP",
+      "messages": [],
+      "reward_info": {
+        "reward": 0.0
+      }
+    },
+    {
+      "id": "sim-1-a",
+      "task_id": "1",
+      "trial": 0,
+      "termination_reason": "USER_STOP",
+      "messages": [],
+      "reward_info": {
+        "reward": 1.0
+      }
+    },
+    {
+      "id": "sim-1-b",
+      "task_id": "1",
+      "trial": 1,
+      "termination_reason": "USER_STOP",
+      "messages": [],
+      "reward_info": {
+        "reward": 1.0
+      }
+    }
+  ]
+}

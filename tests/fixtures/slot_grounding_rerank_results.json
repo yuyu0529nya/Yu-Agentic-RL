@@ -1,0 +1,145 @@
+{
+  "timestamp": "2026-06-15T00:00:00",
+  "info": {
+    "environment_info": {
+      "domain_name": "airline"
+    },
+    "agent_info": {
+      "implementation": "llm_agent",
+      "llm": "fixture-agent"
+    },
+    "user_info": {
+      "implementation": "user_simulator",
+      "llm": "fixture-user"
+    }
+  },
+  "simulations": [
+    {
+      "id": "fixture-bad-ungrounded-user",
+      "task_id": "18",
+      "trial": 0,
+      "termination_reason": "user_stop",
+      "reward_info": {
+        "reward": 0.0,
+        "db_check": {
+          "db_match": false,
+          "db_reward": 0.0
+        },
+        "reward_breakdown": {
+          "COMMUNICATE": 0.0,
+          "DB": 0.0
+        },
+        "action_checks": []
+      },
+      "messages": [
+        {
+          "role": "assistant",
+          "content": "Hi! How can I help you today?",
+          "tool_calls": null
+        },
+        {
+          "role": "user",
+          "content": "I need to downgrade all my business class flights to economy.",
+          "tool_calls": null
+        },
+        {
+          "role": "assistant",
+          "content": "Could you please provide your user ID?",
+          "tool_calls": [
+            {
+              "id": "call_bad_user",
+              "name": "get_user_details",
+              "arguments": {
+                "user_id": "sara_doe_496"
+              }
+            }
+          ]
+        },
+        {
+          "id": "call_bad_user",
+          "role": "tool",
+          "content": "Error: User sara_doe_496 not found",
+          "error": true
+        },
+        {
+          "role": "assistant",
+          "content": "I need to transfer you to a human agent.",
+          "tool_calls": [
+            {
+              "id": "call_bad_transfer",
+              "name": "transfer_to_human_agents",
+              "arguments": {
+                "summary": "User sara_doe_496 not found."
+              }
+            }
+          ]
+        },
+        {
+          "id": "call_bad_transfer",
+          "role": "tool",
+          "content": "Transfer successful",
+          "error": false
+        }
+      ]
+    },
+    {
+      "id": "fixture-good-grounded-user",
+      "task_id": "18",
+      "trial": 1,
+      "termination_reason": "user_stop",
+      "reward_info": {
+        "reward": 1.0,
+        "db_check": {
+          "db_match": true,
+          "db_reward": 1.0
+        },
+        "reward_breakdown": {
+          "COMMUNICATE": 1.0,
+          "DB": 1.0
+        },
+        "action_checks": []
+      },
+      "messages": [
+        {
+          "role": "assistant",
+          "content": "Hi! How can I help you today?",
+          "tool_calls": null
+        },
+        {
+          "role": "user",
+          "content": "I need to downgrade all my business class flights to economy.",
+          "tool_calls": null
+        },
+        {
+          "role": "assistant",
+          "content": "I can help. Could you please provide your user ID?",
+          "tool_calls": null
+        },
+        {
+          "role": "user",
+          "content": "My user id is omar_davis_3817.",
+          "tool_calls": null
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_good_user",
+              "name": "get_user_details",
+              "arguments": {
+                "user_id": "omar_davis_3817"
+              }
+            }
+          ]
+        },
+        {
+          "id": "call_good_user",
+          "role": "tool",
+          "content": "{\"user_id\":\"omar_davis_3817\",\"reservations\":[\"JG7FMM\",\"2FBBAH\"],\"payment_methods\":{\"credit_card_2929732\":{\"source\":\"credit_card\",\"id\":\"credit_card_2929732\"}}}",
+          "error": false
+        }
+      ]
+    }
+  ]
+}

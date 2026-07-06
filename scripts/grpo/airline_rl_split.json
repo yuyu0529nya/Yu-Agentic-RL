@@ -1,0 +1,16 @@
+{
+  "domain": "airline",
+  "total_tasks": 50,
+  "purpose": "GRPO RL train/eval split (distinct from scripts/m1_eval_task_split.json, which was an SFT seen/unseen split for eval-reliability). Deterministic interleave: eval = task ids with id%5 in {0,1}; train = the rest. Interleaving spreads both sets across the full id range to avoid difficulty bias.",
+  "train_task_ids": [
+    "2","3","4","7","8","9","12","13","14","17","18","19","22","23","24",
+    "27","28","29","32","33","34","37","38","39","42","43","44","47","48","49"
+  ],
+  "eval_task_ids": [
+    "0","1","5","6","10","11","15","16","20","21","25","26","30","31","35","36","40","41","45","46"
+  ],
+  "n_train": 30,
+  "n_eval": 20,
+  "rule": "eval iff (int(id) % 5) in {0,1}",
+  "eval_protocol": "pass^1 on the 20 eval (held-out) tasks is the headline metric; also report pass^1 on a sample of train tasks (fitting check). Tighten eval CI with k>1 trials (pass^k) once a candidate adapter beats base."
+}

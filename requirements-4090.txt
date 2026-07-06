@@ -1,0 +1,21 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# Linux 4090 QLoRA dependencies. Keep this file separate from the Windows
+# local requirements so the 3060 environment stays stable.
+#
+# Avoid unconstrained latest installs on rental machines: Transformers 5.x can
+# move APIs underneath our smoke trainer. Do not reinstall torch on AutoDL
+# images; the PyTorch image already ships a CUDA-matched build, and replacing
+# it downloads several GB of CUDA wheels.
+transformers>=4.45.0,<5
+accelerate>=1.0.0,<2
+peft>=0.13.0,<0.20
+datasets>=3.0.0,<6
+tokenizers>=0.20.0,<0.23
+huggingface_hub>=0.26.0,<1
+safetensors>=0.4.5
+sentencepiece>=0.2.0
+protobuf>=5.0.0
+jinja2>=3.1.0
+modelscope>=1.20.0
+bitsandbytes>=0.43.0
