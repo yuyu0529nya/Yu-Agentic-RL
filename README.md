@@ -2,7 +2,19 @@
 
 A **from-scratch GRPO reinforcement-learning stack** for post-training LLM agents —
 trainer, on-policy rollout + evaluation harness, reward design, and diagnostics, all
-built end to end on top of vLLM + QLoRA. No veRL, no TRL — the entire loop is my own.
+built end to end on top of vLLM + QLoRA (single-node, dual-GPU: one card serves a
+self-hosted user-simulator / rollout server, the other runs the QLoRA policy update).
+No veRL, no TRL — the entire loop is my own.
+
+> **Repository map.** This repo is the **overview + shared GRPO trainer** for the whole
+> line of work. Two companion repos hold the full detail of each environment:
+> - [**search-agent-rlvr**](https://github.com/yuyu0529nya/search-agent-rlvr) — the
+>   *controlled-environment RL-science leg* (verifiable-reward retrieval agent; reward
+>   over-optimization studied in isolation).
+> - [**tau2-agentic-rl**](https://github.com/yuyu0529nya/tau2-agentic-rl) — the
+>   *hard-environment leg* (noisy multi-turn tool-calling agent on tau2-bench airline).
+>
+> Start here for the story; go to the leg repos for the round-by-round experiments.
 
 ## Highlights
 - 🚩 **Multi-turn retrieval agent (RLVR): +10.7 pts held-out Exact-Match** — 38.7% → 49.3%
@@ -54,9 +66,25 @@ characterization, SFT-vs-RL comparison, dense process-reward shaping, and a care
 user-simulator **evaluation methodology** (paired testing, bootstrap CIs, controlled
 ablations) — demonstrating end-to-end RL engineering on a hard, realistic agent benchmark.
 
+## Reproduced in veRL & compared to my from-scratch trainer
+To sanity-check the hand-written trainer against an industrial framework, the same GRPO
+loop was brought up on **veRL** (ByteDance's FSDP + vLLM RL stack) on RTX 5090 (Blackwell).
+A point-by-point comparison of the two implementations — advantage normalization, PPO-clip
+vs. plain policy-gradient, KL estimator (both use Schulman k3), token masking, and the
+mechanisms unique to each — is written up in
+[`docs/verl_vs_handwritten_grpo.md`](docs/verl_vs_handwritten_grpo.md).
+
+Two takeaways that double as design notes:
+- **My length-aware advantage (LATA, `√L` normalization) has no equivalent in veRL** — its
+  `loss_agg_mode` only exposes `÷1 / ÷L / ÷const`; `√L` sits between `÷L` and `÷1`.
+- **My outcome-variance gating independently matches DAPO's "dynamic sampling"** (drop
+  all-correct / all-wrong groups) — I arrived at it by diagnosing a *phantom-advantage*
+  failure that coupled reward with length and drove a 0.35 → 0.20 collapse.
+
 ## Tech
 Qwen2.5 (0.5B / 1.5B / 7B) · vLLM · PEFT / QLoRA · bitsandbytes · transformers ·
-tau2-bench · on-policy GRPO with verifiable rewards (RLVR).
+tau2-bench · single-node dual-GPU (policy / user-sim split) · on-policy GRPO with
+verifiable rewards (RLVR) · cross-checked against veRL (FSDP).
 
 *Trained adapters, model weights, and run artifacts are kept out of the repo for size —
 this repository is the code and write-ups.*
