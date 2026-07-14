@@ -319,6 +319,8 @@ def batched_loss(model, device, batch, pad_id, lata, kl_coef=0.0):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="One GRPO update pass over collected rollouts (QLoRA).")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="torch/python RNG seed for the UPDATE (multi-seed robustness replicates).")
     ap.add_argument("--rollouts", required=True)
     ap.add_argument("--base-model", default="/root/autodl-tmp/models/qwen25-7b-instruct")
     ap.add_argument("--adapter-in", default=None, help="existing LoRA to continue (else fresh)")
@@ -357,6 +359,11 @@ def main() -> int:
     ap.add_argument("--progress-every", type=int, default=20,
                     help="print a progress line every N optimizer steps so the run isn't a black box.")
     args = ap.parse_args()
+    if args.seed is not None:
+        import random as _random
+        _random.seed(args.seed); torch.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
+        print(f"[grpo] RNG seeded: {args.seed}")
 
     if not torch.cuda.is_available():
         raise SystemExit("CUDA required.")

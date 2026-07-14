@@ -5,10 +5,12 @@ benchmark), GRPO from a raw base policy had repeatedly produced null results. Di
 cause to **gradient starvation**: a weak base (~20% success) makes most on-policy rollout groups
 all-fail, so intra-group advantage variance vanishes and there is no learning signal. Fix:
 **warm-start the policy with teacher-trajectory distillation, then run GRPO.** Result — held-out
-pass^1 climbs **base 0.23 → distilled SFT 0.32 → GRPO 0.54** (peak 0.56), every RL configuration
-significantly beating both base and its own SFT start (paired bootstrap CI over tasks). The
-decisive evidence is a controlled contrast: the *identical* GRPO ablation from base is all-null;
-the only change that unlocks it is the distillation floor.
+pass^1 climbs **base 0.20 → distilled SFT 0.41 → GRPO 0.55** (10-trial nail-down, n=200 per
+checkpoint, every stage's paired CI excluding 0; single-session peak 0.56), with all four RL
+reward configurations significantly beating both base and their own SFT start. The decisive
+evidence is a controlled contrast: the *identical* GRPO ablation from base is all-null; the only
+change that unlocks it is the distillation floor. Extended training saturates at ~0.55–0.56 by
+iteration ~5 and stays stable through 10 iterations (no over-optimization collapse).
 
 All numbers below are recomputed from raw per-trajectory JSONL; recompute commands are at the end.
 
@@ -137,9 +139,26 @@ For completeness we added Turn-Discounted Advantage (weight each assistant token
 | LATA | 0.550 | +0.18 [+0.08,+0.29] ★ | LATA +0.19 [+0.09,+0.30] ★ |
 
 Turn-Discount is flat off the SFT floor and significantly worse than LATA head-to-head. This
-independently reproduces the reference literature's own ranking (Turn-Discount stagnates while
-LATA keeps climbing) — but on tau2 v2, with our self-built trainer, at matched budget. Mechanism-
-targeted length normalization (LATA) remains the winning lever, consistent with the search-agent leg.
+independently matches the ranking reported in published agentic-RL ablations (turn-discounting
+stagnates while length-aware normalization keeps climbing) — here on tau2 v2, with our self-built
+trainer, at matched budget. Mechanism-targeted length normalization (LATA) remains the winning
+lever, consistent with the search-agent leg.
+
+## 6c. Training-budget saturation (the "just train longer" lever, answered)
+
+The best arm (LATA) was continued from its iter-3 checkpoint for 7 more on-policy iterations
+(10 total), with the checkpoint re-anchored in the new session (paired, same usersim/seed):
+
+```
+base 0.23 · anchor(it3) 0.53 · it4 0.54 · it5 0.56 (peak) · it6–it10 0.55 ×5
+```
+
+- Peak (it5) vs anchor: +0.03, CI [−0.01, +0.08] ns; endpoint (it10) vs anchor: +0.02 [+0.00, +0.05].
+- **The curve saturates at ~0.55–0.56 by iteration ~5** — more budget does not raise the ceiling,
+  consistent with §5 (the ceiling is skill-coverage/measurement-bound, not budget-bound).
+- Equally notable: **no over-optimization collapse through 10 iterations.** The binary-reward
+  search-agent run collapsed at iter 4; here the length-aware advantage holds a stable plateau at
+  3× that depth — the anti-collapse property persists under extended training.
 
 ## 6b. Nail-down (10-trial confirmation)
 
@@ -158,10 +177,28 @@ Every delta's CI excludes 0. The distillation floor is now significant *on its o
 The two best RL checkpoints tie (0.550 vs 0.545) — the bigger mega teacher set did not beat the
 114-set at the RL ceiling, consistent with §5. Headline arc: **base 0.20 → distill 0.41 → RL 0.55**.
 
+## 6d. Training-seed robustness (3 independent replicates)
+
+Three GRPO replicates from the same e9 floor with fully isolated training randomness
+(rollout-sampling and update RNG both re-seeded; eval seed held constant for fair pairing):
+
+| replicate | curve (it1/2/3) | endpoint | Δ vs base | Δ vs SFT-init |
+|---|---|---|---|---|
+| seed 101 | 0.51 / 0.53 / 0.52 | 0.520 | +0.34 ★ | +0.17 ★ |
+| seed 202 | 0.43 / 0.52 / 0.55 | 0.550 | +0.37 ★ | +0.20 ★ |
+| seed 303 | 0.52 / 0.43 / 0.49 | 0.490 | +0.31 ★ | +0.14 ★ |
+
+**Every seed independently replicates both stages with individual significance** (all six paired
+CIs exclude 0). Trajectories differ (early or mid-run dips), but endpoints converge to
+0.49–0.55 (mean 0.52 ± 0.03). The effect is robust to training randomness; only the exact
+endpoint carries ~±0.03 seed variance.
+
 ## 7. Honest caveats
 
 - n = 20 held-out tasks (airline's full held-out set); CIs are wide even where significant. The
   10-trial nail-down (§6b) tightens the per-task rate estimates but the task count is fixed at 20.
+- Endpoint seed-variance is ±0.03 (§6d): quote "0.49–0.55 across seeds, best checkpoint 0.55",
+  not "always 0.55".
 - The self-hosted user-simulator drifts run-to-run (base ranged 0.17–0.23 across sessions), which is
   why same-session base/init are the only valid comparators and cross-night absolute numbers are not.
 - Teacher dialogues used an API user-simulator; evals use the self-hosted 7B — a mild train/eval

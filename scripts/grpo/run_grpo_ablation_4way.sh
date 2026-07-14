@@ -100,19 +100,20 @@ passrate() { $PYBIN -c "import json;rs=[json.loads(l)['reward'] for l in open('$
 run_method() {  # name reward_mode lata [td_alpha]
   # INIT_ADAPTER (env, optional): warm-start every method from this adapter (e.g. a distill-SFT
   # checkpoint) instead of raw base. Empty = original from-base behavior.
-  local name="$1" rm="$2" lata="$3" td="${4:-0}" CUR="${INIT_ADAPTER:-}"
-  echo "############### METHOD $name (reward=$rm lata=$lata td=$td) $(date +%H:%M:%S) ###############"
+  local name="$1" rm="$2" lata="$3" td="${4:-0}" seed_off="${5:-0}" CUR="${INIT_ADAPTER:-}"
+  echo "############### METHOD $name (reward=$rm lata=$lata td=$td seed_off=$seed_off) $(date +%H:%M:%S) ###############"
   for ((it=1; it<=ITERS; it++)); do
     echo "----- $name ITER $it/$ITERS $(date +%H:%M:%S) -----"
     local ROLL="$OUT/${name}_rollouts_it${it}.jsonl" ADP="$OUT/${name}_adapter_it${it}"
     serve_policy "$CUR"
-    collect "$TRAIN_TASK_IDS" "$N" "$TRAIN_TEMP" "abl_${name}_tr${it}" "$ROLL" "$it"
+    collect "$TRAIN_TASK_IDS" "$N" "$TRAIN_TEMP" "abl_${name}_tr${it}" "$ROLL" "$((seed_off + it))"
     stop_policy
     local lf=(); [ "$lata" = "1" ] && lf=(--lata)
     local tf=(); [ "$td" != "0" ] && tf=(--td-alpha "$td")
+    local sf=(); [ "$seed_off" != "0" ] && sf=(--seed "$((seed_off + it))")
     local inf=(); [ -n "$CUR" ] && inf=(--adapter-in "$CUR")
     CUDA_VISIBLE_DEVICES=$POLICY_GPU $PYBIN scripts/grpo/grpo_update.py --rollouts "$ROLL" --base-model "$POLICY_MODEL" \
-      --out-adapter "$ADP" --domain $DOMAIN --reward-mode "$rm" --lr "$LR" "${lf[@]}" "${tf[@]}" "${inf[@]}" || { echo "$name iter $it update FAILED"; break; }
+      --out-adapter "$ADP" --domain $DOMAIN --reward-mode "$rm" --lr "$LR" "${lf[@]}" "${tf[@]}" "${sf[@]}" "${inf[@]}" || { echo "$name iter $it update FAILED"; break; }
     CUR="$ADP"
     serve_policy "$CUR"
     collect "$EVAL_TASK_IDS" "$EVAL_TRIALS" "$EVAL_TEMP" "abl_${name}_ev${it}" "$OUT/${name}_eval_it${it}.jsonl" "$EVAL_SEED"
@@ -148,6 +149,7 @@ for m in $METHODS; do case "$m" in
   prmonly)      run_method prmonly      prm_lite 0;;
   lataonly)     run_method lataonly     binary   1;;
   turndiscount) run_method turndiscount binary   0 "$TD_ALPHA";;   # binary + early-token weighting, no LATA
+  lataonly_s*)  run_method "$m"          binary   1 0 "${m##*_s}";; # seed replicate: lataonly_s<seed> (rollout+update RNG offset; eval seed unchanged)
   *) echo "[abl] unknown method: $m (skipped)";;
 esac; done
 echo "######## GRPO_ABLATION ALLDONE $(date) ########"

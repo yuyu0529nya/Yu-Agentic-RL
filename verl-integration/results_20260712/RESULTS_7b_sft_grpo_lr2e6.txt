@@ -1,0 +1,8 @@
+# tau2 airline 7B SFT->GRPO, lr=2e-6, OpenRouter-72B usersim, workers=2
+# val-core reward/mean@1 curve (10-task val):
+val-core/tau2/airline/reward/mean@1:np.float64(0.4)
+val-core/tau2/airline/reward/mean@1:np.float64(0.4)
+val-core/tau2/airline/reward/mean@1:np.float64(0.2)
+val-core/tau2/airline/reward/mean@1:np.float64(0.4)
+val-core/tau2/airline/reward/mean@1:np.float64(0.4)
+# 结论: 平(围绕SFT baseline 0.4), lr太低; 19步0崩溃, degrade~2/步
