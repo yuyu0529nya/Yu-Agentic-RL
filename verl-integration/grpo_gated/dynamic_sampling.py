@@ -1,6 +1,15 @@
 """
-dynamic_sampling — the +0.14 lever: drop all-same-outcome groups from the GRPO loss so the
-batch isn't diluted by zero-gradient dead weight. This is the hand-written pipeline's
+dynamic_sampling — drop all-same-outcome groups from the GRPO loss so the batch isn't diluted
+by zero-gradient dead weight. This is the hand-written pipeline's
+
+NOTE (2026-07-15): a controlled veRL A/B on tau2-airline REFUTED the hypothesis that this is
+what lifts the curve. Gating OFF reaches val 0.5625; gating ON stalls at 0.4125 — on this
+low-success-rate task it HURTS (it drops 54-75% of the batch and starves the gradient), and the
+earlier flat curve was actually an LR problem. The implementation below is correct (11 unit
+tests; it kills the phantom advantage as designed) but does not transfer to this task. See
+../results_20260712/RESULTS_ab_gating.md. The "+0.14" attribution below is the hand-written
+pipeline's claim and was NOT verified by this A/B — treat it as unconfirmed.
+
 "variance gating" (gate=True in grpo_update.py: all-same-outcome groups get advantage 0 and
 are then DROPPED), ported onto veRL's standard trainer, which lacks it (filter_groups lives
 only in the DAPO recipe).

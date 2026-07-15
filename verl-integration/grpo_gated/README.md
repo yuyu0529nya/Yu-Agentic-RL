@@ -18,10 +18,23 @@ A drop-in advantage estimator that ports two things veRL's **standard** GRPO tra
 veRL standard GRPO from an SFT checkpoint gave a **flat** curve across two LRs
 (lr=4e-6 ×10 steps, lr=2e-5 ×4 steps): train score stuck ~0.19–0.29, `ppo_kl` larger at
 the higher LR but `entropy` **rising** 0.70→0.88 — the policy moved into a more diffuse
-region, not toward reward. Root cause is structural, not tuning:
+region, not toward reward.
+
+> ⚠️ **UPDATE (2026-07-15) — a controlled A/B refuted this section's hypothesis.**
+> The flat curve was an **LR problem**, not a structural sample-efficiency one: raising
+> lr to 1e-4 with **gating OFF** reaches val **0.5625**, while **gating ON** stalls at
+> **0.4125**. Gating *hurts* here — at ~20% success it drops **54–75%** of the batch
+> (`live_frac` 0.25–0.46) and starves the gradient. Full result:
+> [`../results_20260712/RESULTS_ab_gating.md`](../results_20260712/RESULTS_ab_gating.md).
+> The phantom-advantage mechanism below is still real and unit-tested; it simply did not
+> translate into a val gain on this low-success-rate task.
+
+My original hypothesis was that the root cause is structural, not tuning:
 `compute_grpo_outcome_advantage` gives `(score-mean)/(std+eps)`, so an all-same-outcome
 group gets ~0 advantage **but stays in the batch**. At ~20% success with n=8, **17–31%**
-of the batch is such dead weight (see `test_tau2_like_success_rate`).
+of the batch is such dead weight (see `test_tau2_like_success_rate`). *(This part is true;
+what the A/B showed is that removing that dead weight does not help — and hurts — because
+at low success rate the "dead" groups are the majority.)*
 
 ## The gate
 
@@ -63,5 +76,10 @@ shaped reward.
       until the batch is full of contrastful groups (port DAPO's `filter_groups` loop onto
       the standard trainer). The estimator gate alone already fixes phantom advantage; the
       resampling additionally removes dilution.
-- [ ] GPU A/B: `adv_estimator=grpo` vs `grpo_gated` from the same SFT checkpoint — does the
-      curve un-flatten? (the actual payoff run)
+- [x] **GPU A/B done (2026-07-15) — the payoff run, and it refuted the hypothesis.**
+      `grpo` (gating off) reaches val **0.5625**; `grpo_gated` (gating on) stalls at
+      **0.4125**. The flat curve was an LR problem, not sample efficiency; gating *hurts*
+      on tau2 (drops 54–75% of samples). Honest negative result — the estimator itself is
+      correct (11 unit tests). See
+      [`../results_20260712/RESULTS_ab_gating.md`](../results_20260712/RESULTS_ab_gating.md).
+- [ ] Multi-seed (2–3 seeds, mean±std) to promote "gating hurts" from strong to airtight.

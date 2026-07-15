@@ -83,6 +83,15 @@ to say *why* the clip exists, and when you can omit it, is the point.
   in the batch** (contribute zero loss, never dropped); singletons even keep their raw score.
 - This is the same problem DAPO solves with **"dynamic sampling"** — I arrived at it independently
   by diagnosing the failure, and can explain the *why*, not just the *what*.
+- **Measured, 2026-07-15 (honest negative result).** I ported this gate into veRL's standard
+  trainer (`USE_DYNAMIC_SAMPLING`) and ran a single-variable A/B on tau2-airline from a fixed SFT
+  checkpoint: **gating OFF → val 0.5625, gating ON → 0.4125.** On this task the gate *hurts*:
+  at ~20% success most groups are all-fail, so dropping them removes 54–75% of the batch and
+  starves the gradient — the sample-count loss outweighs the denoising. The earlier flat curve I
+  had blamed on this was actually an LR problem (lr too small, `grad_norm≈0.05`). The gate's
+  implementation is still correct (11 unit tests; kills the phantom advantage exactly as designed)
+  — it just doesn't transfer to a low-success-rate task. See
+  [`../verl-integration/results_20260712/RESULTS_ab_gating.md`](../verl-integration/results_20260712/RESULTS_ab_gating.md).
 
 ## 6. Memory / parallelism
 
