@@ -202,6 +202,11 @@ class Tau2AgentLoop(ToolAgentLoop):
         )
         output.extra_fields.update(
             {
+                # Keep the raw terminal task result as a top-level scalar.  The
+                # gated GRPO runtime consumes this exact binary signal to decide
+                # whether a rollout group has real success/failure contrast.  Do
+                # not derive it from a future shaped reward.
+                "outcome_binary": float(reward["reward"] >= 1.0 - 1e-6),
                 "tau2_reward_breakdown": reward["reward_breakdown"],
                 "tau2_termination": reward["termination"],
                 "num_tau2_errors": traj.num_errors,

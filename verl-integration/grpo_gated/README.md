@@ -68,8 +68,34 @@ Highlight — standard GRPO on an all-FAIL group with length-varying shaped rewa
 
 ## Wire into veRL (on the GPU box, needs torch)
 
+**Use the ready-made runtime wiring — do not hand-patch veRL.**
+
+```bash
+../run_tau2_grpo_gated_seed123.sh          # the gated arm, seed pinned
+../run_tau2_grpo_gated_seed123_managed.sh  # + artifact snapshot & verified shutdown
+```
+
+They put [`../gated_runtime/`](../gated_runtime/) on `PYTHONPATH`, so Python auto-imports
+`sitecustomize.py`, which wraps `ray_trainer.compute_advantage` **inside the Ray worker**
+(registering the estimator in the shell's driver process is not enough — `fit` runs in Ray).
+It activates only when `USE_DYNAMIC_SAMPLING=1`, so ordinary GRPO launches are untouched.
+
+It is deliberately **fail-closed** — it raises instead of silently degrading into plain GRPO if:
+- `Tau2AgentLoop` did not export `outcome_binary` (the raw, unshaped success label);
+- the batch has no `uid` grouping key;
+- the installed veRL lacks the expected `RayPPOTrainer.fit` → `compute_advantage(` seam;
+- dynamic sampling masked the **entire** batch (a 0/0 masked loss).
+
+That first check matters: `apply_dynamic_sampling` no-ops when `outcome_binary` is absent, so
+without a hard failure a "gated" run would quietly be an ordinary GRPO run — and the A/B would
+compare two identical arms. `outcome_binary` is emitted by
+[`../tau2_agent_loop.py`](../tau2_agent_loop.py) from the **unshaped** evaluator reward on purpose:
+under PRM/shaping, deriving the gate label from the shaped reward would reintroduce the very
+phantom advantage this gate exists to kill.
+
+Manual alternative (driver process only — insufficient for Ray, kept for reference):
+
 ```python
-# in a module imported at trainer startup
 from grpo_gated import register_grpo_gated
 register_grpo_gated()
 # launch with:  algorithm.adv_estimator=grpo_gated
