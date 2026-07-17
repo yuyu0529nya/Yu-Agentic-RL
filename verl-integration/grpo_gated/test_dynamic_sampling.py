@@ -1,8 +1,15 @@
 """
 CPU unit tests for dynamic_sampling — no torch, no GPU. Run: python3 test_dynamic_sampling.py
 
-Verifies the +0.14 lever: rows in all-same-binary-outcome groups get their response_mask
+Verifies the MECHANICS only: rows in all-same-binary-outcome groups get their response_mask
 zeroed (dropped from the masked-mean loss = un-dilution), while contrastful groups are kept.
+
+These tests say nothing about whether the gate HELPS. It does not: a 2-seed x 2-arm controlled
+A/B (2026-07-16) measured ~no effect on veRL + Adam + binary reward, because the rows it drops
+already have advantage exactly 0 and the un-dilution is just a loss rescale that Adam cancels.
+The "+0.14 lever" framing this file used to carry has been withdrawn — that +0.14 was
+SFT 0.405 -> GRPO 0.545 (the effect of GRPO itself), never attributed to the gate by any control.
+See ../results_20260712/RESULTS_ab_gating.md.
 """
 
 import numpy as np

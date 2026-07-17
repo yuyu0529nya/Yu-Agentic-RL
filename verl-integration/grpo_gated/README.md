@@ -20,21 +20,32 @@ veRL standard GRPO from an SFT checkpoint gave a **flat** curve across two LRs
 the higher LR but `entropy` **rising** 0.70→0.88 — the policy moved into a more diffuse
 region, not toward reward.
 
-> ⚠️ **UPDATE (2026-07-15) — a controlled A/B refuted this section's hypothesis.**
-> The flat curve was an **LR problem**, not a structural sample-efficiency one: raising
-> lr to 1e-4 with **gating OFF** reaches val **0.5625**, while **gating ON** stalls at
-> **0.4125**. Gating *hurts* here — at ~20% success it drops **54–75%** of the batch
-> (`live_frac` 0.25–0.46) and starves the gradient. Full result:
-> [`../results_20260712/RESULTS_ab_gating.md`](../results_20260712/RESULTS_ab_gating.md).
-> The phantom-advantage mechanism below is still real and unit-tested; it simply did not
-> translate into a val gain on this low-success-rate task.
+> ⚠️ **UPDATE (2026-07-16) — a 2-seed × 2-arm controlled A/B refuted this section's hypothesis,
+> and then refuted my first refutation too.** Read this before believing anything below.
+>
+> 1. The flat curve was an **LR problem**, not structural sample efficiency
+>    (`grad_norm≈0.05`, 20× under the clip threshold; `pg_clipfrac≈0.001`). Raising lr to 1e-4
+>    with **gating OFF** reaches val **0.5625 / 0.55** (2 seeds).
+> 2. I then claimed from a **single seed** that gating *hurts* (0.4125 vs 0.5625). **That was
+>    wrong.** On seed=123 the gap collapsed to **0.5375 vs 0.55**. Arm(ON)'s own cross-seed
+>    spread (0.125) exceeds the between-arm mean gap (0.081) → at n=2 there is no effect.
+> 3. **On veRL + Adam + BINARY reward this gate is ≈ a no-op**, and provably so: the rows it
+>    drops have advantage **exactly 0** (std=0 → `(0−0)/(0+eps)`), so nothing can be starved.
+>    Its only mechanical effect is shrinking the `token-mean` denominator (`loss_mask.sum()`),
+>    which scales the loss by `1/live_frac` (measured 2.4×–24×) — and **Adam's scale-invariance
+>    absorbs it**. Measured: `pg_loss` ↑4–17×, `grad_norm` ↑2–3×, but **`ppo_kl` identical** and
+>    **paired train diff = −0.006, 95% CI [−0.018, +0.006]**.
+>
+> Full write-up: [`../results_20260712/RESULTS_ab_gating.md`](../results_20260712/RESULTS_ab_gating.md).
+> The phantom-advantage mechanism below is still real and unit-tested — it just has nothing to do
+> under a **binary** reward (see *Status / next*).
 
 My original hypothesis was that the root cause is structural, not tuning:
 `compute_grpo_outcome_advantage` gives `(score-mean)/(std+eps)`, so an all-same-outcome
 group gets ~0 advantage **but stays in the batch**. At ~20% success with n=8, **17–31%**
-of the batch is such dead weight (see `test_tau2_like_success_rate`). *(This part is true;
-what the A/B showed is that removing that dead weight does not help — and hurts — because
-at low success rate the "dead" groups are the majority.)*
+of the batch is such dead weight (see `test_tau2_like_success_rate`). *(The dilution itself is
+real. What the A/B showed is that **removing it changes nothing**, because those rows' advantage
+is already exactly 0 — so un-diluting them only rescales the loss, and Adam cancels the rescale.)*
 
 ## The gate
 
@@ -72,14 +83,29 @@ shaped reward.
 ## Status / next
 
 - [x] gate + keep-mask core, veRL-registerable wrapper, 11 CPU unit tests passing
-- [ ] **phase 2 (trainer-level):** use `keep` to actually drop rows + resample generations
-      until the batch is full of contrastful groups (port DAPO's `filter_groups` loop onto
-      the standard trainer). The estimator gate alone already fixes phantom advantage; the
-      resampling additionally removes dilution.
-- [x] **GPU A/B done (2026-07-15) — the payoff run, and it refuted the hypothesis.**
-      `grpo` (gating off) reaches val **0.5625**; `grpo_gated` (gating on) stalls at
-      **0.4125**. The flat curve was an LR problem, not sample efficiency; gating *hurts*
-      on tau2 (drops 54–75% of samples). Honest negative result — the estimator itself is
-      correct (11 unit tests). See
+- [x] **GPU A/B done (2026-07-15) — refuted my "sample efficiency" hypothesis.** The flat curve
+      was an LR problem. Single-seed result said gating *hurts* (0.4125 vs 0.5625).
+- [x] **Multi-seed done (2026-07-16) — and it refuted the "gating hurts" claim too.**
+      Filling the 2×2 (`{42,123} × {gating on,off}`) collapsed the effect from **−0.15** (seed=42)
+      to **−0.0125** (seed=123). Same-seed paired train over 20 steps: **−0.006, 95% CI
+      [−0.018, +0.006]** — no effect. **Conclusion: on veRL + Adam + BINARY reward this gate is
+      ≈ a no-op**, mechanistically explained (dropped rows already have advantage 0; the gate only
+      rescales the loss; Adam cancels the rescale). See
       [`../results_20260712/RESULTS_ab_gating.md`](../results_20260712/RESULTS_ab_gating.md).
-- [ ] Multi-seed (2–3 seeds, mean±std) to promote "gating hurts" from strong to airtight.
+      **Methodological lesson: an n=1 RL A/B fabricated a 0.15-sized effect that does not exist.**
+
+### Where this gate could still earn its keep (untested)
+
+Under a **binary** reward an all-fail group has `std = 0` → advantage exactly 0 → **there is no
+phantom advantage to kill**, which is precisely why the A/B above found nothing. The phantom only
+appears under **shaped / PRM rewards**, where an all-fail group has `std > 0` and GRPO fabricates a
+length-concordant advantage (and where DAPO's *std-based* `filter_groups` would **not** catch it —
+that is this gate's genuine differentiator). **That regime was never tested.**
+
+- [ ] **The right test:** run this gate under PRM-Lite / shaped reward, where the phantom exists.
+- [ ] **phase 2 (trainer-level) — now the priority, and it is a confound fix, not an add-on:**
+      use `keep` to physically **drop rows + resample** until the batch is refilled (port DAPO's
+      `filter_groups` loop onto the standard trainer). Mask-zeroing shrinks the `token-mean`
+      denominator, so it is **confounded with a learning-rate change**; drop+resample keeps the
+      denominator constant and cleanly separates "dropping dead groups" from "shrinking the
+      denominator". Cheap to run on GSM8K (deterministic reward → no API cost, low noise).

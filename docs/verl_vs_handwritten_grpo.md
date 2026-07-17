@@ -83,14 +83,30 @@ to say *why* the clip exists, and when you can omit it, is the point.
   in the batch** (contribute zero loss, never dropped); singletons even keep their raw score.
 - This is the same problem DAPO solves with **"dynamic sampling"** — I arrived at it independently
   by diagnosing the failure, and can explain the *why*, not just the *what*.
-- **Measured, 2026-07-15 (honest negative result).** I ported this gate into veRL's standard
-  trainer (`USE_DYNAMIC_SAMPLING`) and ran a single-variable A/B on tau2-airline from a fixed SFT
-  checkpoint: **gating OFF → val 0.5625, gating ON → 0.4125.** On this task the gate *hurts*:
-  at ~20% success most groups are all-fail, so dropping them removes 54–75% of the batch and
-  starves the gradient — the sample-count loss outweighs the denoising. The earlier flat curve I
-  had blamed on this was actually an LR problem (lr too small, `grad_norm≈0.05`). The gate's
-  implementation is still correct (11 unit tests; kills the phantom advantage exactly as designed)
-  — it just doesn't transfer to a low-success-rate task. See
+- **Measured, 2026-07-16 (2 seeds × 2 arms — and it refuted *two* of my own claims).**
+  I ported this gate into veRL's standard trainer (`USE_DYNAMIC_SAMPLING`) and ran a single-variable
+  A/B on tau2-airline from a fixed SFT checkpoint.
+  - **Claim 1 — "this gate fixes the flat curve" → REFUTED.** The flat curve was an **LR problem**
+    (`grad_norm≈0.05`, 20× under the clip threshold; `pg_clipfrac≈0.001`). With lr=1e-4 and gating
+    **OFF**, val reaches **0.5625 / 0.55** (2 seeds).
+  - **Claim 2 — "gating HURTS here" (my own, written 2026-07-15 from a *single* seed: 0.4125 vs
+    0.5625) → ALSO REFUTED.** On seed=123 the gap collapsed to **0.5375 vs 0.55**. Arm(ON)'s own
+    cross-seed spread (0.125) exceeds the between-arm mean gap (0.081) — **at n=2 the effect is
+    not there.**
+  - **What is actually true: on veRL + Adam + BINARY reward this gate is ≈ a no-op**, and provably
+    so. The rows it drops have advantage **exactly 0** (`std=0` → `(0−0)/(0+eps)`), so nothing can
+    be starved. Its only mechanical effect is shrinking the `token-mean` denominator
+    (`loss_mask.sum()`), scaling the loss by `1/live_frac` (measured **2.4×–24×**) — and **Adam's
+    scale-invariance absorbs it**. Measured: `pg_loss` ↑**4–17×**, `grad_norm` ↑**2–3×**, but
+    **`ppo_kl` identical**, **same-seed paired train diff = −0.006, 95% CI [−0.018, +0.006]**, and
+    **val@20 0.5375 vs 0.55**. Even at `live_frac = 0.0417` (276/288 rows dropped, 24× amplification,
+    ONE live group) val was unaffected.
+  - **Why it found nothing:** under a **binary** reward an all-fail group has `std = 0` → advantage
+    exactly 0 → **there is no phantom advantage to kill**. The phantom (and this gate's genuine
+    edge over DAPO's *std-based* filter) only exists under **shaped/PRM rewards** — a regime this
+    A/B never tested. The implementation remains correct (11 unit tests).
+  - **Methodological lesson:** an n=1 RL A/B fabricated a **0.15-sized** effect that does not exist.
+  Full write-up:
   [`../verl-integration/results_20260712/RESULTS_ab_gating.md`](../verl-integration/results_20260712/RESULTS_ab_gating.md).
 
 ## 6. Memory / parallelism
@@ -125,10 +141,30 @@ mode, and the whole pipeline for recovering assistant masks from offline multi-t
 
 GRPO is no longer the single SOTA — DAPO, GSPO, and Dr. GRPO are the well-known refinements, but
 they are *minor refinements of GRPO with the same core idea* (groups of rollouts as the baseline).
-My work already touches these frontier concerns independently: **outcome-variance gating ≈ DAPO
-dynamic sampling**, **LATA ≈ the length-bias problem that Dr. GRPO targets**, and the code already
-exposes `norm_adv_by_std_in_grpo` (the Dr. GRPO std-normalization debate). The natural next step is
-to run DAPO/GSPO in veRL and add them to this comparison.
+My work already touches these frontier concerns independently: **outcome-variance gating sits in the
+same design space as DAPO's dynamic sampling**, **LATA ≈ the length-bias problem that Dr. GRPO
+targets**, and the code already exposes `norm_adv_by_std_in_grpo` (the Dr. GRPO std-normalization
+debate).
+
+**Two precise differences from DAPO's dynamic sampling** (both found by measurement, not by reading
+the paper):
+
+1. **Gate signal — my genuine edge.** DAPO filters on the *reward-metric std*. Under shaped/PRM
+   rewards an all-fail group has `std > 0`, so it **survives DAPO's filter** and GRPO fabricates a
+   length-concordant phantom advantage that trains the model to give up faster. Gating on the
+   *binary outcome* kills that. **DAPO would not.** (Untested in a paid run — this is the regime
+   where the gate should be evaluated, and the natural next experiment.)
+2. **Drop mechanism — DAPO's is right and mine is confounded.** DAPO does a *physical* row-drop and
+   **resamples to refill the batch**, so the loss denominator stays constant. Mine zeroes the
+   `response_mask`, which **shrinks** the `token-mean` denominator (`loss_mask.sum()`) and therefore
+   scales the loss by `1/live_frac` (measured **2.4×–24×**) — i.e. it is **confounded with a
+   learning-rate change**. Adam's scale-invariance then absorbs most of it, which is why the A/B in
+   §5 measured ≈ no effect. Porting DAPO's drop+resample loop onto the standard trainer is the
+   correct fix and cleanly separates the two effects.
+
+The natural next step is to run DAPO/GSPO/Dr.GRPO in veRL on GSM8K (deterministic reward → no API
+cost, low noise) and add them to this comparison — with the drop+resample port as the same
+experiment's control.
 
 ---
 
